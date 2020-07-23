@@ -1,0 +1,148 @@
+
+<!doctype html>
+<html>
+
+<head>
+	<title>SeggyTherm</title>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.5.0/Chart.min.js"></script>
+	<script src="utils.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css">
+	<style>
+		canvas {
+			-moz-user-select: none;
+			-webkit-user-select: none;
+			-ms-user-select: none;
+		}
+	</style>
+</head>
+
+<body>
+	<h1>SeggyTherm</h1>
+	<div style="width:80%;">
+		<canvas id="canvas"></canvas>
+	</div>
+	<br>
+	<script>
+
+
+		
+		// Load weather.txt and parse
+		var flag = 0;
+		var tempData = [];
+		var humidData = [];
+		var client = new XMLHttpRequest();
+		client.open('GET', '/weather.txt');
+		client.onreadystatechange = function() {
+
+			rawData = client.responseText.split('\n');
+			for (let i = 1; i < rawData.length; i++) {
+
+				var reading = rawData[i];
+				reading = reading.split("|");
+				if(reading[1]=='nan'){
+					continue
+				}else{
+					time = newDateString(reading[0])
+					temp = {
+						x:time,
+						y:reading[1]
+					}
+					humid = {
+						x:time,
+						y:reading[2]
+					}
+					tempData.push(temp);
+					humidData.push(humid);
+				}
+			}
+		}
+		client.send();
+
+
+
+
+
+
+
+
+
+
+
+		var timeFormat = 'MM/DD/YYYY HH:mm';
+
+		function newDate(days) {
+			return moment().add(days, 'd').toDate();
+		}
+
+		function newDateString(epoch) {
+			// return moment().add(days, 'd').format(timeFormat);
+			var D = new Date(epoch*1000)
+			return moment(D).format(timeFormat);
+		}
+
+		var color = Chart.helpers.color;
+		var config = {
+			responsive:true,
+			type: 'line',
+			data: {
+				labels: [ // Date Objects
+					newDate(0),
+					newDate(1),
+					newDate(2),
+					newDate(3),
+					newDate(4),
+					newDate(5),
+					newDate(6)
+				],
+				datasets: [{
+					label: 'Temperature',
+					backgroundColor: color(window.chartColors.red).alpha(0.5).rgbString(),
+					borderColor: window.chartColors.red,
+					fill: false,
+					data: tempData,
+				}, {
+					label: 'Humidity',
+					backgroundColor: color(window.chartColors.blue).alpha(0.5).rgbString(),
+					borderColor: window.chartColors.blue,
+					fill: false,
+					data: humidData,
+				},]
+			},
+			options: {
+				title: {
+					text: 'Chart.js Time Scale'
+				},
+				scales: {
+					xAxes: [{
+						type: 'time',
+						time: {
+							parser: timeFormat,
+							// round: 'day'
+							tooltipFormat: 'll HH:mm'
+						},
+						scaleLabel: {
+							// display: true,
+							// labelString: 'Date'
+						}
+					}],
+					yAxes: [{
+						scaleLabel: {
+							display: true,
+							labelString: 'Reading'
+						}
+					}]
+				},
+			}
+		};
+
+		window.onload = function() {
+			var ctx = document.getElementById('canvas').getContext('2d');
+			window.myLine = new Chart(ctx, config);
+
+		};
+
+	</script>
+</body>
+
+</html>
