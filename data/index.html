@@ -37,8 +37,9 @@
 
 			rawData = client.responseText.split('\n');
 			for (let i = 1; i < rawData.length; i++) {
-
+				
 				var reading = rawData[i];
+				if(reading==""){continue} //Uhhhhh
 				reading = reading.split("|");
 				if(reading[1]=='nan'){
 					continue

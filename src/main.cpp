@@ -1,21 +1,22 @@
-/********************************************************************************
- * 
- *                                 seggyTherm
- *                  
- *                  Displays temperature from a DHT22 sensor
- *                  on SSD1306 128x64 display as well as 
- *                  web interface to display graphs of locally
- *                  logged data.
- * 
- *                  ToDo: optionally connect to remote ESPs or
- *                  report to a centralized server for more nodes.
- *                   
- *                                   - Seglectic Softworks 2020
- *             
- ********************************************************************************/
+
+ 
+                // █▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█
+                // █                 seggyTherm                       █
+                // █                                                  █
+                // █  Displays temperature from a DHT22 sensor        █
+                // █  on SSD1306 128x64 display as well as            █
+                // █  web interface to display graphs of locally      █
+                // █  logged data.                                    █
+                // █                                                  █
+                // █                                                  █
+                // █                   - Seglectic Softworks 2020     █
+                // █                                                  █
+                // █▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄█
+
+// TODO Maybe make it send to a more reliable server?
 
 
-
+// SECTION Pre-Setup
 /****************************************************************************************************************************************************************
  *  
  *                                                          Libraries 📚
@@ -37,7 +38,6 @@
 
 
 
-
 /****************************************************************************************************************************************************************
  *  
  *                                                          I/O Setup 📺
@@ -51,11 +51,13 @@
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);     // Initialize display object as 'display'
 DHTesp dht;                                                                   // Initialize temp sensor as 'dht'
 
-String Version = "0.00.000.000.00.000.1a";
+String Version = "0.00.000.00.000.1a";
 
 int saveTimer = 0;
 int saveInterval = 60000;
 int lastMillis = 0;
+
+
 
 /****************************************************************************************************************************************************************
  *  
@@ -67,8 +69,10 @@ WiFiUDP ntpUDP;                                                     // Configure
 NTPClient timeClient(ntpUDP,"pool.ntp.org",0,86400000);             // offset for GMT-5 and 24h update interval (8.64e+7ms)
 // NTPClient timeClient(ntpUDP,"pool.ntp.org",-14400,60);           // offset for GMT-5 and 60 second update interval
 
+//!SECTION
 
 
+// SECTION Web Config
 /****************************************************************************************************************************************************************
  *  
  *                                                          Web Server File Handling 📂
@@ -167,11 +171,89 @@ void getTemp(){
   server.send(200,"text/plain",response);
 }
 
+// !SECTION
+
+
+// SECTION Misc Functions
+
+ /* * * * * * * * * * * * * * * * * * * * *
+ *             localTemp()
+ *             
+ *     Displays Local temps to screen
+  * * * * * * * * * * * * * * * * * * * * */
+void localTemps(){
+  display.clearDisplay();
+  // Get data from sensors
+  float tempC    = dht.getTemperature();
+  float tempF    = tempC*1.8+32;
+  float humidity = dht.getHumidity();
+  
+  // display.fillRect(0,0,128,53,BLACK);           // Clear top area (x,y,w,h,clr)
+  display.setTextSize(3);         
+  display.setTextColor(WHITE);                  
+  display.setCursor(0,17);
+ 
+  if(isnan(tempC)){
+    display.setTextSize(2);
+    display.setCursor(5,2);
+    display.println("SENSOR\n ERROR");
+    display.drawRect(70,33,50,31,WHITE);
+    display.drawPixel(random(70,120),random(33,64),WHITE);
+    delay(5); 
+  }else{
+    //display.print(int(round(tempF)));
+    display.print(int(round(tempF)));
+    display.println("F ");
+    display.print(int(round(humidity)));
+    display.print("%");
+
+    //Print smaller secondary unit display
+    display.setCursor(90,17);
+    display.setTextSize(2);
+    display.print(int(round(tempC)));
+    display.print("C");
+
+    int TY = map(tempF,50,100,0,128);
+    display.fillRect(0,0,TY,14,WHITE);
+  }
+  display.display();
+}
 
 
 
+ /* * * * * * * * * * * * * * * * * * * * *
+ *             logData()
+ *             
+ *     Logs temp (metric) & humidity data
+ *  to weather.txt file for reading from browser
+  * * * * * * * * * * * * * * * * * * * * */
+
+ bool logData(){
+   int m = millis();
+   saveTimer+= m-lastMillis;
+   lastMillis = m;
+
+   if(saveTimer>saveInterval){
+    saveTimer=0;
+    File saveFile = SPIFFS.open("/weather.txt","a");                  // Open save file in append mode
+    if(!saveFile){                                                    
+      Serial.println("failed to open save file");                     // Check if file opened
+      return false;
+    }else{
+      String saveData = String(timeClient.getEpochTime()) +"|"+ String(dht.getTemperature()) + "|" + String(dht.getHumidity());
+      saveFile.println( saveData );                                   // Save color in data param
+      saveFile.close(); 
+      Serial.println("Saved me some data.");
+    }
+   }else{
+     return false;
+   }
+ }
+
+// !SECTION
 
 
+// SECTION Setup
 /****************************************************************************************************************************************************************
  *  
  *                                                          Main Setup 🚧
@@ -238,81 +320,9 @@ void setup() {
 
 Serial.println(timeClient.getFormattedTime());
 }
+// !SECTION
 
 
- /* * * * * * * * * * * * * * * * * * * * *
- *             localTemp()
- *             
- *     Displays Local temps to screen
-  * * * * * * * * * * * * * * * * * * * * */
-void localTemps(){
-  display.clearDisplay();
-  // Get data from sensors
-  float tempC = dht.getTemperature();
-  float tempF = tempC*1.8+32;
-  float humidity = dht.getHumidity();
-  
-  // display.fillRect(0,0,128,53,BLACK);           // Clear top area (x,y,w,h,clr)
-  display.setTextSize(3);         
-  display.setTextColor(WHITE);                  
-  display.setCursor(0,17);
- 
-  if(isnan(tempC)){
-    display.setTextSize(2);
-    display.setCursor(5,2);
-    display.println("SENSOR\n ERROR");
-    display.drawRect(70,33,50,31,WHITE);
-    display.drawPixel(random(70,120),random(33,64),WHITE);
-    delay(5); 
-  }else{
-    //display.print(int(round(tempF)));
-    display.print(int(round(tempF)));
-    display.println("F ");
-    display.print(int(round(humidity)));
-    display.print("%");
-
-    //Print smaller secondary unit display
-    display.setCursor(90,17);
-    display.setTextSize(2);
-    display.print(int(round(tempC)));
-    display.print("C");
-
-    int TY = map(tempF,50,100,0,128);
-    display.fillRect(0,0,TY,14,WHITE);
-  }
-  display.display();
-}
-
-
-
- /* * * * * * * * * * * * * * * * * * * * *
- *             logData()
- *             
- *     Logs temp (metric) & humidity data
- *  to weather.txt file for reading from browser
-  * * * * * * * * * * * * * * * * * * * * */
-
- bool logData(){
-   int m = millis();
-   saveTimer+= m-lastMillis;
-   lastMillis = m;
-
-   if(saveTimer>saveInterval){
-    saveTimer=0;
-    File saveFile = SPIFFS.open("/weather.txt","a");                  // Open save file in append mode
-    if(!saveFile){                                                    
-      Serial.println("failed to open save file");                     // Check if file opened
-      return false;
-    }else{
-      String saveData = String(timeClient.getEpochTime()) +"|"+ String(dht.getTemperature()) + "|" + String(dht.getHumidity());
-      saveFile.println( saveData );                                   // Save color in data param
-      saveFile.close(); 
-      Serial.println("Saved me some data.");
-    }
-   }else{
-     return false;
-   }
- }
 
 
 
@@ -330,3 +340,5 @@ void loop() {
   server.handleClient();
   
 }
+
+
